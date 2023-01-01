@@ -3,75 +3,33 @@ import schedule
 import time as tm
 import sqlite3
 from datetime import time,timedelta,datetime
-from atk_training_nitesh_psq import process
-
-class action(process):
-    @staticmethod
-    def init_process(*item):
-        for item_ in item:
-            return item_.upper()
+from atk_training_nitesh_psq import read_yaml
+from atk_training_nitesh_psq.sqlite_ import SQLITE
 
 
 app=typer.Typer()
 
-def job(db_path:str='queue.db'):
+
+
+def job(config:str,db_path:str='queue.db'):
+    sql_=SQLITE()
+    d=read_yaml(config)
+    d=d['process_func']
+    # importing the module numpy
+    main = __import__(d)
+# importing an array from numpy
+    process= getattr(main, "process")
     print("running in a manager")
-    with sqlite3.connect(db_path) as conn:
-
-    # Create a cursor
-            cursor = conn.cursor()
-
-    # Select the first pending item from the queue
-            cursor.execute('''
-            SELECT * FROM Queue
-                    WHERE status = 'pending'
-                    ''')
-
-    # Fetch the item
-            item = cursor.fetchall()
+    sql_.process(process)
     
 
-            if item is not None:
-        # Process the item
-                for item_ in item:
-                    status='completed'
-                    #logger.info(item_)
-                    try_num=item_[3]
 
-                    try:
-            
-                        logger.info("Processing Item: ---->  " + action.init_process(item_[1]))
-                        try_num+=1
-                    except Exception as e:
-                        logger.info('item cannot be processed',e)
-                    if try_num>3:
-                        status="manual check"
-
-
-                    
-
-        # Update the item's status to "completed"
-                    cursor.execute('''
-                        UPDATE Queue
-                        SET status = ?,
-                            retries = ?,
-                            end_time= CURRENT_TIMESTAMP
-                        WHERE id = ?
-                        ''', (status,try_num,item_[0],))
-        
-
-        
-
-        # Commit the changes
-                    conn.commit()
-
-
-schedule.every(5).minutes.do(job)
 @app.command()
-def manager():
+def manager(config:str):
+    schedule.every(5).minutes.do(lambda: job(config))
     while True:
         schedule.run_pending()
-        tm.sleep(10)
+        tm.sleep(20)
     
 
 def main():
